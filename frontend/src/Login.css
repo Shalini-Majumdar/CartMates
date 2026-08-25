@@ -1,0 +1,209 @@
+* {
+  box-sizing: border-box;
+}
+
+.default-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: "Outfit", sans-serif;
+}
+
+body {
+  height: 100vh;
+  width: 100vw;
+}
+
+.login-body {
+  height: 100vh;
+  width: 100vw;
+  background-color: antiquewhite;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.login-left {
+  width: 60%;
+  height: 100%;
+  background-color: #7378f4;
+  min-width: 300px;
+}
+
+.login-right {
+  width: 40%;
+  min-width: 300px;
+  height: 100%;
+  background: #f1f3f7;
+  justify-content: flex-start;
+}
+
+.login-main {
+  background: #f9fafb;
+  width: 100%;
+  height: 85%;
+  gap: 20px;
+  padding: 0px 80px;
+  border-bottom-left-radius: 150px;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.15);
+}
+
+.login-title {
+  width: 100%;
+  height: 10%;
+  align-items: flex-start;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.login-user-div {
+  width: 100%;
+  height: 8%;
+}
+
+.login-password-div {
+  width: 100%;
+  height: 8%;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateY(60px); /* Slide in from the right */
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.login {
+  height: 100%;
+  width: 100%;
+  background-color: white;
+  border-radius: 7px;
+  padding-left: 15px;
+  border: 1px solid #e4e4e4;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.signup {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+.login:focus {
+  border: 1px solid #c6c6c6;
+}
+
+.login-button-div {
+  width: 100%;
+  height: 8%;
+}
+
+.login-button {
+  height: 100%;
+  width: 100%;
+  background-color: #3a7ff9;
+  border-radius: 7px;
+  border: 1px solid #497fdd;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.5s ease;
+  text-decoration: none;
+}
+
+.login-button:hover {
+  background-color: #1761e0;
+}
+
+.login-footer {
+  width: 100%;
+  height: 5%;
+  color: #949494;
+  font-weight: 300;
+  flex-direction: row;
+}
+
+.login-footer span {
+  transition: all 0.5s ease;
+  color: #3a7ff9;
+  cursor: pointer;
+}
+
+.login-footer span:hover {
+  font-weight: 400;
+}
+
+.hidden {
+  display: none;
+}
+
+.login-error {
+  color: red;
+}
+
+@media screen and (max-width: 1024px) {
+  .login-body {
+    flex-direction: column-reverse;
+  }
+
+  .login-left,
+  .login-right {
+    width: 100%;
+    height: 50%;
+  }
+
+  .login-main {
+    height: 100%;
+    padding: 20px 40px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .login-title {
+    font-size: 1.8rem;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .login-main {
+    padding: 20px 20px;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+  }
+
+  .login-button {
+    font-size: 0.9rem;
+  }
+
+  .login-footer {
+    font-size: 0.85rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .login-title {
+    font-size: 1.3rem;
+  }
+
+  .login-button {
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+
+  .login,
+  .signup {
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+
+  .login-footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}

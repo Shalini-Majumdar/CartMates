@@ -1,0 +1,199 @@
+.default-home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: "Outfit", sans-serif;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* body {
+  background-color: aqua;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+} */
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+.homepage-body {
+  background-color: #f8fafc;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 100vh;
+  /* height: 100%; */
+  gap: 40px;
+}
+
+.header {
+  height: 80px;
+  width: 100%;
+  background-color: #3b82f6;
+  align-items: flex-start;
+  padding: 20px;
+  font-size: 1.4rem;
+  color: white;
+}
+
+.main-heading-div {
+  height: 60px;
+  width: 75%;
+  /* background-color: aquamarine; */
+  flex-direction: row;
+}
+
+.main-title {
+  width: 50%;
+  height: 100%;
+  font-size: 2rem;
+  align-items: flex-start;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-weight: 300;
+  font-size: 1.1rem;
+  margin-top: 5px;
+  padding-left: 2px;
+  color: #787878;
+}
+
+.main-button-div {
+  width: 50%;
+  height: 100%;
+  font-size: 2rem;
+  align-items: flex-end;
+}
+
+.main-button {
+  width: 30%;
+  height: 80%;
+  border: none;
+  outline: none;
+  background-color: #3b82f6;
+  border-radius: 10px;
+  color: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.main-button:hover {
+  background-color: #166df9;
+}
+
+.main-body {
+  /* height: fit-content; */
+  width: 75%;
+  /* background-color: white; */
+  flex-grow: 1;
+  border-radius: 10px;
+  gap: 15px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.footer {
+  height: 100px;
+  width: 100%;
+  background-color: aquamarine;
+}
+
+.loading-popup {
+  margin-top: 50px;
+  height: fit-content;
+  width: fit-content;
+  padding: 30px;
+  background-color: rgb(66, 160, 255);
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* HTML: <div class="loader"></div> */
+.loader {
+  --s: 28px;
+  height: var(--s);
+  aspect-ratio: 2.5;
+  --_g: #000 90%, #0000;
+  --_g0: no-repeat radial-gradient(farthest-side, var(--_g));
+  --_g1: no-repeat radial-gradient(farthest-side at top, var(--_g));
+  --_g2: no-repeat radial-gradient(farthest-side at bottom, var(--_g));
+  background: var(--_g0), var(--_g1), var(--_g2), var(--_g0), var(--_g1),
+    var(--_g2);
+  background-size: 20% 50%, 20% 25%, 20% 25%;
+  animation: l45 1s infinite;
+}
+@keyframes l45 {
+  0% {
+    background-position: calc(0 * 100% / 3) 50%,
+      calc(1 * 100% / 3) calc(50% + calc(var(--s) / 8)),
+      calc(1 * 100% / 3) calc(50% - calc(var(--s) / 8)), calc(3 * 100% / 3) 50%,
+      calc(2 * 100% / 3) calc(50% + calc(var(--s) / 8)),
+      calc(2 * 100% / 3) calc(50% - calc(var(--s) / 8));
+  }
+  33% {
+    background-position: calc(0 * 100% / 3) 50%, calc(1 * 100% / 3) 100%,
+      calc(1 * 100% / 3) 0, calc(3 * 100% / 3) 50%, calc(2 * 100% / 3) 100%,
+      calc(2 * 100% / 3) 0;
+  }
+  66% {
+    background-position: calc(1 * 100% / 3) 50%, calc(0 * 100% / 3) 100%,
+      calc(0 * 100% / 3) 0, calc(2 * 100% / 3) 50%, calc(3 * 100% / 3) 100%,
+      calc(3 * 100% / 3) 0;
+  }
+  90%,
+  100% {
+    background-position: calc(1 * 100% / 3) 50%,
+      calc(0 * 100% / 3) calc(50% + calc(var(--s) / 8)),
+      calc(0 * 100% / 3) calc(50% - calc(var(--s) / 8)), calc(2 * 100% / 3) 50%,
+      calc(3 * 100% / 3) calc(50% + calc(var(--s) / 8)),
+      calc(3 * 100% / 3) calc(50% - calc(var(--s) / 8));
+  }
+}
+
+/* Tablet: 2 items per row */
+@media (max-width: 1024px) {
+  .main-heading-div {
+    height: 150px;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .main-button {
+    width: 40%;
+  }
+  .main-body {
+    width: 90%;
+  }
+
+  .cart-div {
+    width: calc(50% - 20px);
+  }
+}
+
+/* Mobile: 1 item per row */
+@media (max-width: 600px) {
+  .main-heading-div,
+  .main-button-div,
+  .main-title {
+    flex-direction: column;
+    width: 100%;
+    text-align: center;
+  }
+
+  .main-button {
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .cart-div {
+    width: 100%;
+  }
+}

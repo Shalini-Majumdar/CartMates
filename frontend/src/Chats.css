@@ -1,0 +1,34 @@
+.default-chat {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-div {
+  width: fit-content;
+  max-width: 80%;
+  height: fit-content;
+  gap: 12px;
+}
+
+.message-div-receive {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+  width: fit-content;
+  max-width: 80%;
+  height: fit-content;
+  gap: 12px;
+}
+
+.message {
+  width: fit-content;
+  height: fit-content;
+  background-color: rgb(226, 243, 255);
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.msg-user img {
+  margin: 0;
+}

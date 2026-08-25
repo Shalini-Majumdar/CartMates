@@ -1,0 +1,12 @@
+{
+  "name": "React Frontend Dev Container",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "frontend",
+  "workspaceFolder": "/app",
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"],
+  "forwardPorts": [3000],
+  "shutdownAction": "stopCompose"
+}
