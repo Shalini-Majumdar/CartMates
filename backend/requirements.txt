@@ -1,5 +1,7 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+# google-genai (under langchain-google-genai 4.x) needs anyio>=4.8; the old
+# fastapi==0.104.1 pin capped anyio below 4, so the two could not coexist.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
 bcrypt==4.1.2
@@ -23,6 +25,9 @@ pydantic-settings>=2.2,<3
 
 # Shopping assistant. The agent uses native function calling through
 # LangGraph's prebuilt tool-calling agent; plain `langchain` is not imported.
-langchain-core>=0.3.0,<1.0.0
-langchain-google-genai>=2.0.0,<3.0.0
-langgraph>=0.2.50,<1.0.0
+# Gemini 3 models need the "thought signatures" that langchain-google-genai
+# 4.x sends back with tool calls; 2.x omits them and the agent's second turn
+# is rejected.
+langchain-core>=1.6,<2
+langchain-google-genai>=4.4,<5
+langgraph>=1.2,<2

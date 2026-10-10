@@ -12,17 +12,47 @@ import { clearSession } from "./api";
 export default function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const userName = localStorage.getItem("userName") || "";
   const [query, setQuery] = useState("");
 
-  // Keep the box in step with the shop page's own search.
+  // What the box searches depends on the page: the cart list, the items in
+  // the open cart, or (everywhere else) the store's products.
+  const scope =
+    location.pathname === "/carts"
+      ? "carts"
+      : location.pathname.startsWith("/cart/")
+      ? "cart-items"
+      : "products";
+  const placeholder = {
+    carts: "Search your carts…",
+    "cart-items": "Search this cart…",
+    products: "Search products…",
+  }[scope];
+  const filtersInPlace = scope !== "products";
+
+  // Keep the box in step with the page's ?q= (the shop's, or the filter of
+  // the carts / cart page) as you move between pages.
   useEffect(() => {
-    setQuery(location.pathname === "/home" ? searchParams.get("q") || "" : "");
-  }, [location.pathname, searchParams]);
+    setQuery(
+      location.pathname === "/home" || filtersInPlace
+        ? searchParams.get("q") || ""
+        : ""
+    );
+  }, [location.pathname, searchParams, filtersInPlace]);
+
+  const handleChange = (e) => {
+    const value = e.target.value;
+    setQuery(value);
+    // Carts and cart items filter as you type, without adding history entries.
+    if (filtersInPlace) {
+      setSearchParams(value.trim() ? { q: value } : {}, { replace: true });
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (filtersInPlace) return;
     const q = query.trim();
     navigate(q ? `/home?q=${encodeURIComponent(q)}` : "/home");
   };
@@ -70,10 +100,10 @@ export default function NavBar() {
           </svg>
           <input
             type="search"
-            placeholder="Search products…"
-            aria-label="Search products"
+            placeholder={placeholder}
+            aria-label={placeholder.replace("…", "")}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleChange}
           />
         </form>
 

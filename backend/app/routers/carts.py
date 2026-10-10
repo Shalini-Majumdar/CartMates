@@ -12,10 +12,11 @@ from crud.crud import (
     delete_cart,
     get_cart_users,
     get_user_carts_with_totals,
+    update_cart,
 )
 from database import get_db
 from models.models import User as UserModel
-from schemas.schemas import Cart, CartCreate, CheckoutReceipt, User
+from schemas.schemas import Cart, CartCreate, CartUpdate, CheckoutReceipt, User
 from security import ensure_cart_member, ensure_cart_owner, get_current_user
 
 router = APIRouter(prefix="/carts", tags=["carts"])
@@ -42,6 +43,22 @@ def create_new_cart(
         u.user_name for u in get_cart_users(db, new_cart.cart_id)
     ]
     return new_cart
+
+
+@router.patch("/{cart_id}", response_model=Cart)
+def edit_cart(
+    cart_id: int,
+    changes: CartUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Rename, re-describe, or change who the cart is shared with."""
+    # Same rule as deleting: only the creator manages a shared cart.
+    cart = ensure_cart_owner(db, cart_id, current_user)
+    cart = update_cart(db, cart, changes)
+    cart.total = calculate_cart_total(db, cart.cart_id)
+    cart.shared_usernames = [u.user_name for u in get_cart_users(db, cart.cart_id)]
+    return cart
 
 
 @router.delete("/{cart_id}")

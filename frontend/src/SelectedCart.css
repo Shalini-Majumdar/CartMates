@@ -336,3 +336,14 @@
     font-size: 0.9rem;
   }
 }
+
+/* Empty-state text sits on the dark chat panel, so it needs a light colour. */
+.right-body .no-items-message {
+  width: 100%;
+  margin: auto 0;
+  padding: 0 12px;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}

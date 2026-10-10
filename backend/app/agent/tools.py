@@ -40,7 +40,10 @@ MIN_SEARCH_WORD_LENGTH = 3
 
 
 def _money(value) -> str:
-    return f"${Decimal(str(value)):.2f}"
+    """Format a rupee amount for the model, e.g. ₹219 or ₹1,234.50."""
+    amount = Decimal(str(value))
+    text = f"{amount:,.2f}"
+    return f"₹{text[:-3] if text.endswith('.00') else text}"
 
 
 def _truncate(text: Optional[str], limit: int = MAX_DESCRIPTION_CHARS) -> str:
@@ -76,7 +79,7 @@ class SearchProductsArgs(BaseModel):
     max_price: Optional[float] = Field(
         default=None,
         description=(
-            "Maximum price per item, in dollars. Omit entirely when the user "
+            "Maximum price per item, in Indian rupees. Omit entirely when the user "
             "gave no budget — do not invent one."
         ),
     )

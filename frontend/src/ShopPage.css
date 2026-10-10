@@ -293,6 +293,17 @@
   margin-top: 8px;
 }
 
+.shop-credits {
+  margin-top: 28px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.shop-credits a {
+  color: #64748b;
+}
+
 /* Toast */
 
 .shop-toast {

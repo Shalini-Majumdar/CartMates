@@ -1,6 +1,6 @@
 {
-  "short_name": "Shared Cart",
-  "name": "Shared Shopping Cart",
+  "short_name": "CartMates",
+  "name": "CartMates",
   "icons": [
     {
       "src": "favicon.svg",

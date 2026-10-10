@@ -95,6 +95,22 @@
   background-color: #ff9f9f;
 }
 
+.edit-div {
+  height: fit-content;
+  width: fit-content;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.edit-div:hover {
+  background-color: #dbeafe;
+}
+
 .row2 {
   height: 50%;
   width: 100%;

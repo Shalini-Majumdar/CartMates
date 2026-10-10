@@ -360,3 +360,17 @@ textarea.form-control {
   color: #6b7280;
   font-size: 14px;
 }
+
+.form-error {
+  display: block;
+  margin-top: 6px;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 6px;
+  color: #b45309;
+  font-size: 13px;
+}

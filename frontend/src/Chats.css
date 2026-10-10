@@ -32,3 +32,11 @@
 .msg-user img {
   margin: 0;
 }
+
+.bot-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #fff;
+}

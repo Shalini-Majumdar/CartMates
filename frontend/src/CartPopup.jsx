@@ -2,15 +2,32 @@ import "./CartPopup.css";
 import { useState, useEffect } from "react";
 import { apiFetch } from "./api";
 
-export default function CartPopup({ onClose, onSubmit }) {
+// Pass `cart` to edit an existing cart; leave it out to create a new one.
+export default function CartPopup({ onClose, onSubmit, cart = null }) {
   const userId = localStorage.getItem("userId");
-  const [cartTitle, setCartTitle] = useState("");
-  const [cartDescription, setCartDescription] = useState("");
+  const isEdit = cart !== null;
+  const [cartTitle, setCartTitle] = useState(cart?.cart_name || "");
+  const [cartDescription, setCartDescription] = useState(
+    cart?.cart_description || ""
+  );
   const [allUsers, setAllUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
-  const [isShared, setIsShared] = useState(false);
+  const [isShared, setIsShared] = useState(Boolean(cart?.is_shared));
+  const [triedSubmit, setTriedSubmit] = useState(false);
+
+  // When editing, start with the cart's current members selected.
+  useEffect(() => {
+    if (!isEdit) return;
+    apiFetch(`/carts/${cart.cart_id}/users`)
+      .then((members) =>
+        setSelectedFriends(
+          members.filter((u) => String(u.user_id) !== String(userId))
+        )
+      )
+      .catch((error) => console.error("Error fetching members:", error));
+  }, [isEdit, cart?.cart_id, userId]);
 
   // Fetch all users on mount
   useEffect(() => {
@@ -52,13 +69,24 @@ export default function CartPopup({ onClose, onSubmit }) {
     }
   };
 
+  const titleMissing = cartTitle.trim() === "";
+
   const handleSubmit = () => {
-    const cartPayload = {
-      cart_name: cartTitle,
-      cart_description: cartDescription,
-      shared_with: isShared ? selectedFriends.map((f) => f.user_id) : [],
-      is_shared: isShared,
-    };
+    setTriedSubmit(true);
+    if (titleMissing) return;
+    const sharedWith = isShared ? selectedFriends.map((f) => f.user_id) : [];
+    const cartPayload = isEdit
+      ? {
+          cart_name: cartTitle.trim(),
+          cart_description: cartDescription,
+          shared_with: sharedWith,
+        }
+      : {
+          cart_name: cartTitle.trim(),
+          cart_description: cartDescription,
+          shared_with: sharedWith,
+          is_shared: isShared,
+        };
     onSubmit(cartPayload);
     onClose();
   };
@@ -67,7 +95,7 @@ export default function CartPopup({ onClose, onSubmit }) {
     <div className="popup-overlay">
       <div className="popup">
         <div className="popup-header">
-          <h2>Configure Cart</h2>
+          <h2>{isEdit ? "Edit Cart" : "Configure Cart"}</h2>
           <button className="close-btn" onClick={onClose}>
             &times;
           </button>
@@ -83,7 +111,11 @@ export default function CartPopup({ onClose, onSubmit }) {
               placeholder="Enter cart title..."
               value={cartTitle}
               onChange={(e) => setCartTitle(e.target.value)}
+              aria-invalid={triedSubmit && titleMissing}
             />
+            {triedSubmit && titleMissing && (
+              <span className="form-error">Give the cart a name.</span>
+            )}
           </div>
 
           <div className="form-group">
@@ -106,6 +138,12 @@ export default function CartPopup({ onClose, onSubmit }) {
               />
               &nbsp;Share this cart with friends
             </label>
+            {isEdit && !isShared && selectedFriends.length > 0 && (
+              <span className="form-hint">
+                Saving will remove {selectedFriends.length} member(s) from
+                this cart.
+              </span>
+            )}
           </div>
 
           {isShared && (
@@ -170,7 +208,7 @@ export default function CartPopup({ onClose, onSubmit }) {
             Cancel
           </button>
           <button className="btn btn-secondary" onClick={handleSubmit}>
-            Add New Cart
+            {isEdit ? "Save changes" : "Add New Cart"}
           </button>
         </div>
       </div>

@@ -17,10 +17,10 @@ const SORT_OPTIONS = [
 ];
 
 const PRICE_PRESETS = [
-  { label: "Under $3", min: "", max: "3" },
-  { label: "$3 – $6", min: "3", max: "6" },
-  { label: "$6 – $10", min: "6", max: "10" },
-  { label: "Over $10", min: "10", max: "" },
+  { label: "Under ₹250", min: "", max: "250" },
+  { label: "₹250 – ₹500", min: "250", max: "500" },
+  { label: "₹500 – ₹900", min: "500", max: "900" },
+  { label: "Over ₹900", min: "900", max: "" },
 ];
 
 function readLastCart() {
@@ -177,11 +177,11 @@ export default function ShopPage() {
               </div>
               <div className="price-range">
                 <label>
-                  <span>Min $</span>
+                  <span>Min ₹</span>
                   <input
                     type="number"
                     min="0"
-                    step="0.5"
+                    step="10"
                     inputMode="decimal"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value)}
@@ -189,11 +189,11 @@ export default function ShopPage() {
                 </label>
                 <span className="price-range-dash">–</span>
                 <label>
-                  <span>Max $</span>
+                  <span>Max ₹</span>
                   <input
                     type="number"
                     min="0"
-                    step="0.5"
+                    step="10"
                     inputMode="decimal"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value)}
@@ -286,6 +286,16 @@ export default function ShopPage() {
                 ))}
               </div>
             )}
+            <p className="shop-credits">
+              Product photos via{" "}
+              <a href="https://openverse.org" target="_blank" rel="noreferrer">
+                Openverse
+              </a>{" "}
+              (CC0, public domain and CC BY).{" "}
+              <a href="/products/CREDITS.md" target="_blank" rel="noreferrer">
+                Photo credits
+              </a>
+            </p>
           </main>
         </div>
       </div>

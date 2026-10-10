@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from models.models import User, Cart, CartUser, Product, CartItem, Message
-from schemas.schemas import UserCreate, CartCreate, MessageCreate
+from schemas.schemas import UserCreate, CartCreate, CartUpdate, MessageCreate
 import bcrypt
 from decimal import Decimal
 
@@ -84,6 +84,34 @@ def create_cart(db: Session, cart: CartCreate, user_id: int):
     db.commit()
 
     return db_cart
+
+
+def update_cart(db: Session, cart: Cart, changes: CartUpdate):
+    """Apply an edit from the cart's owner. Returns the updated cart."""
+    if changes.cart_name is not None:
+        cart.cart_name = changes.cart_name.strip()
+    if changes.cart_description is not None:
+        cart.cart_description = changes.cart_description
+
+    if changes.shared_with is not None:
+        wanted = {cart.created_by} | {
+            u.user_id
+            for u in db.query(User).filter(User.user_id.in_(changes.shared_with)).all()
+        }
+        current = {
+            row.user_id: row
+            for row in db.query(CartUser).filter(CartUser.cart_id == cart.cart_id).all()
+        }
+        for user_id, row in current.items():
+            if user_id not in wanted:
+                db.delete(row)
+        for user_id in wanted - current.keys():
+            db.add(CartUser(user_id=user_id, cart_id=cart.cart_id))
+        cart.is_shared = len(wanted) > 1
+
+    db.commit()
+    db.refresh(cart)
+    return cart
 
 
 def delete_cart(db: Session, cart_id: int):

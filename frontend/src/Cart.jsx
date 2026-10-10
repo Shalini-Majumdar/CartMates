@@ -3,6 +3,7 @@ import UserIcon from "./UserIcon";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { apiFetch } from "./api";
+import { money } from "./format";
 
 export default function Cart(props) {
   const [users, setUsers] = useState([]);
@@ -20,7 +21,8 @@ export default function Cart(props) {
     if (props.cartId) {
       fetchUsers();
     }
-  }, [props.cartId]);
+    // membersKey changes when the cart is edited, so avatars refresh.
+  }, [props.cartId, props.membersKey]);
 
   // const users = [
   //   { id: 1, name: "Alice Sharma" },
@@ -55,6 +57,26 @@ export default function Cart(props) {
           <div className="default-cart cart-desc">{props.cartDesc}</div>
         </div>
         <div className="default-cart col2">
+          {props.onEdit && (
+            <button
+              type="button"
+              className="default-cart edit-div"
+              onClick={props.onEdit}
+              title="Edit cart"
+              aria-label={`Edit ${props.cartName}`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="#2563eb"
+                className="bi bi-pencil"
+                viewBox="0 0 16 16"
+              >
+                <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325" />
+              </svg>
+            </button>
+          )}
           <div className="default-cart delete-div" onClick={props.onDelete}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +95,7 @@ export default function Cart(props) {
 
       <div className="default-cart row2">
         <div className="default-cart row-2-col-1">
-          <div className="default-cart price">${props.price}</div>
+          <div className="default-cart price">{money(props.price)}</div>
         </div>
 
         <div className="default-cart row-2-col-2">

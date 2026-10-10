@@ -1,10 +1,16 @@
 import "./SelectedCart.css";
 import Product from "./Product";
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import ErrorPopup from "./Error";
 import Chats from "./Chats";
 import { apiFetch } from "./api";
+import { money } from "./format";
 
 export default function SelectedCart(props) {
   const userId = localStorage.getItem("userId");
@@ -24,6 +30,18 @@ export default function SelectedCart(props) {
   const [errorMessage, setErrorMessage] = useState("");
   const [users, setUsers] = useState([]);
   const [totalCost, setTotalCost] = useState(null);
+  // Set by the search box in the top bar; matches approved and pending items.
+  const [searchParams] = useSearchParams();
+  const search = (searchParams.get("q") || "").trim().toLowerCase();
+  const visibleItems = search
+    ? cartItems.filter((item) =>
+        [
+          item.product.product_name,
+          item.product.product_description,
+          item.product.category,
+        ].some((field) => (field || "").toLowerCase().includes(search))
+      )
+    : cartItems;
 
   //To fetch all products for the selected cart------------------
 
@@ -250,8 +268,12 @@ export default function SelectedCart(props) {
                     <div className="no-items-message">
                       No items in this cart.
                     </div>
+                  ) : visibleItems.length === 0 ? (
+                    <div className="no-items-message">
+                      No items in this cart match “{searchParams.get("q")}”.
+                    </div>
                   ) : (
-                    cartItems.map((p) => (
+                    visibleItems.map((p) => (
                       <Product
                         key={p.cart_item_id}
                         pId={p.cart_item_id}
@@ -282,7 +304,7 @@ export default function SelectedCart(props) {
                     Total (approved items)
                   </span>
                   <span className="left-footer-price">
-                    ${totalCost !== null ? totalCost : cartPrice ?? "0.00"}
+                    {money(totalCost !== null ? totalCost : cartPrice ?? 0)}
                   </span>
                 </div>
                 <button

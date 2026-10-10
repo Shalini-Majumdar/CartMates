@@ -1,4 +1,5 @@
 import "./Product.css";
+import { money } from "./format";
 
 export default function Product(props) {
   // Quantity is owned by the parent so it always matches the server.
@@ -78,7 +79,7 @@ export default function Product(props) {
               </div>
             </div>
 
-            <div className="item product-price">${totalPrice}</div>
+            <div className="item product-price">{money(totalPrice)}</div>
           </div>
         </div>
         <div className={!props.approved ? "row-2" : "row-2-hidden"}>

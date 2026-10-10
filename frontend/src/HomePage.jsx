@@ -4,11 +4,23 @@ import { useEffect, useState } from "react";
 import CartPopup from "./CartPopup";
 import ErrorPopup from "./Error";
 import { apiFetch } from "./api";
+import { useSearchParams } from "react-router-dom";
 
 export default function HomePage(props) {
   const userId = localStorage.getItem("userId");
   const [cartData, setCartData] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
+  const [editingCart, setEditingCart] = useState(null);
+  // Set by the search box in the top bar.
+  const [searchParams] = useSearchParams();
+  const search = (searchParams.get("q") || "").trim().toLowerCase();
+  const visibleCarts = search
+    ? cartData.filter(
+        (cart) =>
+          cart.cart_name.toLowerCase().includes(search) ||
+          (cart.cart_description || "").toLowerCase().includes(search)
+      )
+    : cartData;
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -65,6 +77,22 @@ export default function HomePage(props) {
     }
   };
 
+  //To edit a cart's name, description or members
+
+  const handleEditCart = async (cartId, changes) => {
+    try {
+      const updated = await apiFetch(`/carts/${cartId}`, {
+        method: "PATCH",
+        body: JSON.stringify(changes),
+      });
+      setCartData((prev) =>
+        prev.map((cart) => (cart.cart_id === cartId ? updated : cart))
+      );
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    }
+  };
+
   return (
     <>
       <ErrorPopup message={errorMessage} onClose={() => setErrorMessage("")} />
@@ -91,13 +119,25 @@ export default function HomePage(props) {
               onClose={() => setShowPopup(false)}
             />
           )}
+
+          {editingCart && (
+            <CartPopup
+              cart={editingCart}
+              onSubmit={(changes) => handleEditCart(editingCart.cart_id, changes)}
+              onClose={() => setEditingCart(null)}
+            />
+          )}
         </div>
         <div className="default-home main-body">
           {isLoading ? (
             // <div className="loading-popup">Loading carts...</div>
             <div className="loader"></div>
+          ) : search && visibleCarts.length === 0 ? (
+            <div className="no-carts-message">
+              No carts match “{searchParams.get("q")}”.
+            </div>
           ) : (
-            cartData.map((cart) => (
+            visibleCarts.map((cart) => (
               <Cart
                 key={cart.cart_id}
                 cartId={cart.cart_id}
@@ -106,6 +146,13 @@ export default function HomePage(props) {
                 date={cart.date_created}
                 price={cart.total}
                 onDelete={() => handleDelete(cart.cart_id)}
+                // Only the creator may edit, matching the backend rule.
+                onEdit={
+                  String(cart.created_by) === String(userId)
+                    ? () => setEditingCart(cart)
+                    : undefined
+                }
+                membersKey={(cart.shared_usernames || []).join(",")}
                 shared={cart.is_shared}
               />
             ))

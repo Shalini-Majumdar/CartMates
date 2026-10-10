@@ -8,9 +8,10 @@ import { money } from "./format";
 const PLACEHOLDER_IMG =
   "https://www.svgrepo.com/show/508699/landscape-placeholder.svg";
 
-// Simulated delivery pricing for the demo checkout.
-const FREE_DELIVERY_FROM = 25;
-const DELIVERY_FEE = 2.99;
+// Simulated delivery pricing for the demo checkout, in rupees (the former
+// $25 / $2.99 converted at the same ₹88 rate as the catalogue).
+const FREE_DELIVERY_FROM = 2200;
+const DELIVERY_FEE = 263;
 
 const PAYMENT_METHODS = [
   { value: "upi", label: "UPI", hint: "Pay with any UPI app" },

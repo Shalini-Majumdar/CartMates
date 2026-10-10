@@ -35,14 +35,21 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Gemini 3.x models require thought signatures on function calls, which
-# langchain-google-genai 2.x does not send; moving past 2.5 means upgrading the
-# langchain/langgraph stack first.
-# Override with GEMINI_MODEL in .env, e.g. to move to a model with a separate
-# free-tier quota.
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-# Low temperature: this is tool selection and budget arithmetic, not prose.
-TEMPERATURE = 0.1
+# Tried in order. Each model has its own free-tier quota, so when one is used
+# up (or retired) the next one answers instead. The lite models come first:
+# their suggestions are a little weaker but their free allowance goes further.
+# Override with a comma-separated GEMINI_MODELS in .env.
+DEFAULT_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash"
+MODEL_NAMES = [
+    name.strip()
+    for name in os.getenv("GEMINI_MODELS", DEFAULT_MODELS).split(",")
+    if name.strip()
+]
+# Low temperature suits tool selection and budget arithmetic on Gemini 2.x.
+# Google recommends leaving Gemini 3 at its default of 1.0; lower values can
+# make it loop.
+LEGACY_TEMPERATURE = 0.1
+GEMINI_3_TEMPERATURE = 1.0
 # Wall-clock limit for a single Gemini call.
 REQUEST_TIMEOUT_SECONDS = 30
 # Each tool round trip costs two graph steps, so this allows ~9 rounds (cart
@@ -64,6 +71,11 @@ _UNDONE_CHANGE_FALLBACK = (
     "again, perhaps naming the items you want?"
 )
 
+_PARTIAL_CHANGE_REPLY = (
+    "I made some changes to the cart but could not finish. Please check the "
+    "items and ask again for anything still missing."
+)
+
 _GENERIC_FAILURE = (
     "Sorry, I could not work on the cart just now. Please try again in a moment."
 )
@@ -82,27 +94,28 @@ class AssistantError(Exception):
         self.cause = cause
 
 
-def _build_llm() -> ChatGoogleGenerativeAI:
+def _build_llms() -> list[ChatGoogleGenerativeAI]:
     if not os.getenv("GOOGLE_API_KEY"):
-        raise AssistantError(
-            "The shopping assistant is not configured yet, so I cannot help with "
-            "the cart right now."
+        logger.warning("GOOGLE_API_KEY is not set; the assistant is disabled.")
+        return []
+    return [
+        ChatGoogleGenerativeAI(
+            model=name,
+            temperature=(
+                GEMINI_3_TEMPERATURE if name.startswith("gemini-3") else LEGACY_TEMPERATURE
+            ),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            # One quick retry for a blip; a spent quota falls through to the
+            # next model instead of waiting here.
+            max_retries=1,
         )
-    return ChatGoogleGenerativeAI(
-        model=MODEL_NAME,
-        temperature=TEMPERATURE,
-        timeout=REQUEST_TIMEOUT_SECONDS,
-        max_retries=2,
-    )
+        for name in MODEL_NAMES
+    ]
 
 
-# The model client is stateless and safe to share; the agent graph is rebuilt
+# Model clients are stateless and safe to share; the agent graph is rebuilt
 # per request because its tools are bound to that request's cart and user.
-try:
-    _llm: Optional[ChatGoogleGenerativeAI] = _build_llm()
-except AssistantError as exc:
-    logger.warning("Gemini client unavailable at import: %s", exc.user_message)
-    _llm = None
+_llms = _build_llms()
 
 
 def _message_text(message: BaseMessage) -> str:
@@ -121,6 +134,25 @@ def _message_text(message: BaseMessage) -> str:
     return str(content).strip()
 
 
+def _should_try_next_model(exc: BaseException) -> bool:
+    """Failures another model may not share: a spent quota, a retired model,
+    or an overloaded one."""
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    return (
+        "resourceexhausted" in name
+        or "resource_exhausted" in text
+        or "quota" in text
+        or "429" in text
+        or "notfound" in name
+        or "not_found" in text
+        or "no longer available" in text
+        or "503" in text
+        or "overloaded" in text
+        or "unavailable" in text
+    )
+
+
 def _classify(exc: BaseException) -> str:
     """Map a failure to a message worth showing the user."""
     name = type(exc).__name__
@@ -131,7 +163,12 @@ def _classify(exc: BaseException) -> str:
             "That turned out to be more involved than I could work through in "
             "one go. Could you narrow it down a little?"
         )
-    if "resourceexhausted" in name.lower() or "quota" in text or "rate limit" in text:
+    if (
+        "resourceexhausted" in name.lower()
+        or "resource_exhausted" in text
+        or "quota" in text
+        or "rate limit" in text
+    ):
         return (
             "I have hit my usage limit for the moment. Please try again shortly."
         )
@@ -160,7 +197,7 @@ def run_shopping_assistant(
     `cart_id` and `user_id` are bound into the tools and never shown to the
     model. Returns the assistant's reply and a log of what it changed.
     """
-    if _llm is None:
+    if not _llms:
         raise AssistantError(
             "The shopping assistant is not configured yet, so I cannot help "
             "with the cart right now."
@@ -169,7 +206,6 @@ def run_shopping_assistant(
         raise AssistantError("There was no message for me to reply to.")
 
     tools, mutation_log = build_tools(db=db, cart_id=cart_id, user_id=user_id)
-    agent = create_react_agent(_llm, tools)
 
     # Run the two read-only lookups the model needs on every turn here, so
     # they cost no model requests.
@@ -186,18 +222,47 @@ def run_shopping_assistant(
         *history,
     ]
 
+    agents = [(llm.model, create_react_agent(llm, tools)) for llm in _llms]
+
     def _invoke(msgs: list[BaseMessage]) -> list[BaseMessage]:
-        try:
-            result = agent.invoke(
-                {"messages": msgs},
-                config={"recursion_limit": RECURSION_LIMIT},
+        last_exc: Optional[BaseException] = None
+        for model_name, agent in agents:
+            try:
+                result = agent.invoke(
+                    {"messages": msgs},
+                    config={"recursion_limit": RECURSION_LIMIT},
+                )
+                return result.get("messages", [])
+            except Exception as exc:  # noqa: BLE001 - classified below
+                last_exc = exc
+                # Once the cart has changed, starting over on another model
+                # could add the same items twice, so stop here instead.
+                if _should_try_next_model(exc) and not mutation_log.cart_changed:
+                    logger.warning(
+                        "Model %s unavailable (%s); trying the next one",
+                        model_name,
+                        str(exc).splitlines()[0][:200],
+                    )
+                    continue
+                break
+
+        if mutation_log.cart_changed:
+            # Part of the work was done before the failure. Report it rather
+            # than an error that suggests nothing happened.
+            logger.warning(
+                "Assistant stopped after changing the cart (cart_id=%s): %s",
+                cart_id,
+                last_exc,
             )
-        except Exception as exc:  # noqa: BLE001 - classified and re-raised below
-            logger.exception(
-                "Assistant run failed (cart_id=%s, user_id=%s)", cart_id, user_id
-            )
-            raise AssistantError(_classify(exc), cause=exc) from exc
-        return result.get("messages", [])
+            return [AIMessage(content=_PARTIAL_CHANGE_REPLY)]
+
+        logger.error(
+            "Assistant run failed on every model (cart_id=%s, user_id=%s)",
+            cart_id,
+            user_id,
+            exc_info=last_exc,
+        )
+        raise AssistantError(_classify(last_exc), cause=last_exc) from last_exc
 
     def _last_reply(msgs: list[BaseMessage]) -> str:
         for message in reversed(msgs):

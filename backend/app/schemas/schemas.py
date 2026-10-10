@@ -63,6 +63,21 @@ class CartCreate(CartBase):
     shared_with: list[int] = []
 
 
+class CartUpdate(BaseModel):
+    """Fields left out are not changed. `shared_with` is the full list of other
+    members: anyone not in it is removed (the owner always stays)."""
+    cart_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    cart_description: Optional[str] = None
+    shared_with: Optional[list[int]] = None
+
+    @field_validator('cart_name')
+    @classmethod
+    def name_not_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError('Cart name cannot be blank')
+        return v.strip() if v is not None else v
+
+
 class Cart(CartBase):
     cart_id: int
     date_created: datetime
