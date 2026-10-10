@@ -14,7 +14,7 @@ logging.basicConfig(
 # Schema is owned by Alembic (`alembic upgrade head`), not by create_all at
 # import time: this database is shared, so changes need reviewable migrations.
 
-app = FastAPI(title="Shopping Cart API", version="1.0.0")
+app = FastAPI(title="CartMates API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,7 +35,7 @@ app.include_router(users.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Shopping Cart API"}
+    return {"message": "Welcome to CartMates API"}
 
 
 @app.get("/health")
