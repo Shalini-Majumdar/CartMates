@@ -1,5 +1,6 @@
 import "./CartPopup.css";
 import { useState, useEffect } from "react";
+import { apiFetch } from "./api";
 
 export default function CartPopup({ onClose, onSubmit }) {
   const userId = localStorage.getItem("userId");
@@ -12,41 +13,31 @@ export default function CartPopup({ onClose, onSubmit }) {
   const [isShared, setIsShared] = useState(false);
 
   // Fetch all users on mount
-  //   useEffect(() => {
-  //     const fetchUsers = async () => {
-  //       try {
-  //         const res = await fetch("http://localhost:5000/api/get_users");
-  //         const data = await res.json(); // Expected: [{ user_id, user_name }]
-  //         setAllUsers(data);
-  //         setFilteredUsers(data);
-  //       } catch (error) {
-  //         console.error("Error fetching users:", error);
-  //         setAllUsers([]);
-  //       }
-  //     };
-
-  //     fetchUsers();
-  //   }, []);
-
   useEffect(() => {
-    // Dummy users
-    const dummyUsers = [
-      { user_id: 1, user_name: "Shaunak" },
-      { user_id: 2, user_name: "Riya" },
-      { user_id: 3, user_name: "Aryan" },
-      { user_id: 4, user_name: "Tanvi" },
-      { user_id: 5, user_name: "Aman" },
-      { user_id: 6, user_name: "Sanya" },
-    ];
+    const fetchUsers = async () => {
+      try {
+        const data = await apiFetch("/users");
+        // You are always in your own cart, so don't offer yourself.
+        const others = data.filter((u) => String(u.user_id) !== String(userId));
+        setAllUsers(others);
+        setFilteredUsers(others);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        setAllUsers([]);
+        setFilteredUsers([]);
+      }
+    };
 
-    setAllUsers(dummyUsers);
-    setFilteredUsers(dummyUsers);
-  }, []);
+    fetchUsers();
+  }, [userId]);
 
-  // Handle search input change
+  // Match on name or email: names repeat, emails are unique.
   useEffect(() => {
-    const results = allUsers.filter((user) =>
-      user.user_name.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchTerm.trim().toLowerCase();
+    const results = allUsers.filter(
+      (user) =>
+        user.user_name.toLowerCase().includes(term) ||
+        user.email.toLowerCase().includes(term)
     );
     setFilteredUsers(results);
   }, [searchTerm, allUsers]);
@@ -66,8 +57,7 @@ export default function CartPopup({ onClose, onSubmit }) {
       cart_name: cartTitle,
       cart_description: cartDescription,
       shared_with: isShared ? selectedFriends.map((f) => f.user_id) : [],
-      is_shared: isShared ? 1 : 0,
-      // user_id: userId,
+      is_shared: isShared,
     };
     onSubmit(cartPayload);
     onClose();
@@ -127,7 +117,7 @@ export default function CartPopup({ onClose, onSubmit }) {
                   type="text"
                   id="friendSearch"
                   className="search-input"
-                  placeholder="Search friends..."
+                  placeholder="Search by name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -148,7 +138,8 @@ export default function CartPopup({ onClose, onSubmit }) {
                       }`}
                       onClick={() => toggleFriend(user)}
                     >
-                      {user.user_name}
+                      <span className="search-item-name">{user.user_name}</span>
+                      <span className="search-item-email">{user.email}</span>
                     </div>
                   ))}
                   {filteredUsers.length === 0 && (
@@ -159,8 +150,13 @@ export default function CartPopup({ onClose, onSubmit }) {
 
               <div className="selected-friends">
                 {selectedFriends.map((friend) => (
-                  <span key={friend.user_id} className="friend-pill">
+                  <span
+                    key={friend.user_id}
+                    className="friend-pill"
+                    title={friend.email}
+                  >
                     {friend.user_name}
+                    <span className="friend-pill-email">{friend.email}</span>
                     <button onClick={() => toggleFriend(friend)}>×</button>
                   </span>
                 ))}

@@ -27,9 +27,10 @@
   background-color: #f8fafc;
   justify-content: flex-start;
   width: 100%;
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   /* height: 100%; */
   gap: 40px;
+  padding-top: 40px;
 }
 
 .header {
@@ -101,9 +102,8 @@
 }
 
 .footer {
-  height: 100px;
+  height: 60px;
   width: 100%;
-  background-color: aquamarine;
 }
 
 .loading-popup {

@@ -2,7 +2,7 @@ import "./Cart.css";
 import UserIcon from "./UserIcon";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import Error from "./Error";
+import { apiFetch } from "./api";
 
 export default function Cart(props) {
   const [users, setUsers] = useState([]);
@@ -10,12 +10,8 @@ export default function Cart(props) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:8000/carts/${props.cartId}/users`
-        );
-        if (!res.ok) throw new Error("Failed to fetch cart users");
-        const data = await res.json();
-        setUsers(data); // Populate users array with API response
+        const data = await apiFetch(`/carts/${props.cartId}/users`);
+        setUsers(data);
       } catch (err) {
         console.error(err);
       }
@@ -65,7 +61,7 @@ export default function Cart(props) {
               width="16"
               height="16"
               fill="red"
-              class="bi bi-trash"
+              className="bi bi-trash"
               viewBox="0 0 16 16"
             >
               <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
@@ -89,7 +85,7 @@ export default function Cart(props) {
               </div>
               <div className="default-cart users">
                 {users.map((user) => (
-                  <UserIcon key={user.id} img={user.user_name} />
+                  <UserIcon key={user.user_id} img={user.user_name} />
                 ))}
               </div>
             </>
@@ -107,7 +103,7 @@ export default function Cart(props) {
           </div> */}
 
           <div className="default-cart datetime">
-            {props.date.split("T")[0]}
+            {props.date ? props.date.split("T")[0] : ""}
           </div>
         </div>
       </div>

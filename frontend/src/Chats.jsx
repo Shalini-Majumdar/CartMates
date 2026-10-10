@@ -1,12 +1,12 @@
 import "./Chats.css";
 
-export default function (props) {
+export default function Chats(props) {
   const userId = localStorage.getItem("userId");
   return (
     <>
       <div
         className={
-          props.senderId == userId
+          String(props.senderId) === String(userId)
             ? "default-chat message-div-receive"
             : "default-chat message-div"
         }

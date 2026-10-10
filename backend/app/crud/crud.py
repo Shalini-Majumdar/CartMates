@@ -1,7 +1,7 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from models.models import User, Cart, CartUser, Product, CartItem, Message
-from schemas.schemas import UserCreate, CartCreate, ProductCreate, CartItemCreate, MessageCreate, CartItemResponse
+from schemas.schemas import UserCreate, CartCreate, MessageCreate
 import bcrypt
 from decimal import Decimal
 
@@ -22,7 +22,7 @@ def create_user(db: Session, user: UserCreate):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return User.model_validate(db_user)
+    return db_user
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -68,35 +68,48 @@ def create_cart(db: Session, cart: CartCreate, user_id: int):
     db.refresh(db_cart)
     
     # Add creator to cart_users
-    cart_user = CartUser(user_id=user_id, cart_id=db_cart.cart_id)
-    db.add(cart_user)
+    member_ids = [user_id]
+    for friend_id in cart.shared_with:
+        if friend_id not in member_ids:
+            member_ids.append(friend_id)
+
+    existing_users = {
+        u.user_id
+        for u in db.query(User).filter(User.user_id.in_(member_ids)).all()
+    }
+
+    for member_id in member_ids:
+        if member_id in existing_users:
+            db.add(CartUser(user_id=member_id, cart_id=db_cart.cart_id))
     db.commit()
-    
+
     return db_cart
 
 
 def delete_cart(db: Session, cart_id: int):
-    cart_users = db.query(CartUser).filter(CartUser.cart_id == cart_id).all()
-    for cart_user in cart_users:
-        db.delete(cart_user)
     db_cart = db.query(Cart).filter(Cart.cart_id == cart_id).first()
-    if db_cart:
-        db.delete(db_cart)
-        db.commit()
-        return True
-    return False
+    if not db_cart:
+        return False
+
+    # Cart.cart_users / cart_items / messages cascade delete-orphan, so the
+    # children go with it.
+    db.delete(db_cart)
+    db.commit()
+    return True
 
 
 def get_cart_users(db: Session, cart_id: int):
     return db.query(User).join(CartUser).filter(CartUser.cart_id == cart_id).all()
 
 
-def get_cart_products(db: Session, cart_id: int):
-    return db.query(CartItem).filter(CartItem.cart_id == cart_id).all()
-
-
-def get_cart_item(db: Session, cart_item_id: int):
-    return db.query(CartItem).filter(CartItem.cart_item_id == cart_item_id).first()
+def get_cart_items(db: Session, cart_id: int):
+    """Cart lines with their product eager-loaded (the response embeds it)."""
+    return (
+        db.query(CartItem)
+        .options(joinedload(CartItem.product))
+        .filter(CartItem.cart_id == cart_id)
+        .all()
+    )
 
 
 def increase_cart_item_quantity(db: Session, cart_item_id: int):
@@ -110,23 +123,25 @@ def increase_cart_item_quantity(db: Session, cart_item_id: int):
 
 
 def decrease_cart_item_quantity(db: Session, cart_item_id: int):
+    """Decrement an item, removing it at zero.
+
+    Returns (cart_id, new_quantity). new_quantity is None when the row was
+    deleted, so callers never have to introspect the returned object.
+    """
     cart_item = db.query(CartItem).filter(CartItem.cart_item_id == cart_item_id).first()
-    if cart_item:
-        cart_id = cart_item.cart_id
-        if cart_item.quantity > 1:
-            cart_item.quantity -= 1
-            db.commit()
-            db.refresh(cart_item)
-            return cart_item
-        else:
-            db.delete(cart_item)
-            db.commit()
-            # Return a dummy object with the cart_id
-            class DeletedItem:
-                def __init__(self, cart_id):
-                    self.cart_id = cart_id
-            return DeletedItem(cart_id)
-    return None
+    if cart_item is None:
+        return None, None
+
+    cart_id = cart_item.cart_id
+    if cart_item.quantity > 1:
+        cart_item.quantity -= 1
+        db.commit()
+        db.refresh(cart_item)
+        return cart_id, cart_item.quantity
+
+    db.delete(cart_item)
+    db.commit()
+    return cart_id, None
 
 
 
@@ -141,12 +156,73 @@ def approve_cart_item(db: Session, cart_item_id: int):
 
 
 def disapprove_cart_item(db: Session, cart_item_id: int):
+    """Remove an item from the cart. Returns its cart_id, or None if not found."""
     cart_item = db.query(CartItem).filter(CartItem.cart_item_id == cart_item_id).first()
     if cart_item:
+        cart_id = cart_item.cart_id
         db.delete(cart_item)
         db.commit()
-        return True
-    return False
+        return cart_id
+    return None
+
+
+def add_product_to_cart(db: Session, cart_id: int, product_id: int, quantity: int, user_id: int):
+    """Add a product a member picked by hand, or top up its quantity.
+
+    Returns the cart line, or None if the product does not exist. A person's own
+    pick is approved straight away; only the assistant's suggestions wait for
+    review.
+    """
+    if db.query(Product).filter(Product.product_id == product_id).first() is None:
+        return None
+
+    cart_item = (
+        db.query(CartItem)
+        .filter(CartItem.cart_id == cart_id, CartItem.product_id == product_id)
+        .first()
+    )
+    if cart_item:
+        cart_item.quantity += quantity
+        cart_item.approved = True
+    else:
+        cart_item = CartItem(
+            cart_id=cart_id,
+            product_id=product_id,
+            added_by=user_id,
+            quantity=quantity,
+            approved=True,
+        )
+        db.add(cart_item)
+    db.commit()
+    db.refresh(cart_item)
+    return cart_item
+
+
+def checkout_cart(db: Session, cart: Cart):
+    """Simulated purchase: take the approved lines out of the cart.
+
+    No payment is taken and no order is stored. Returns (lines, pending_count),
+    where lines are the purchased CartItems with their products loaded; it is
+    the caller's job to turn them into a receipt before they are expired.
+    """
+    items = get_cart_items(db, cart_id=cart.cart_id)
+    purchased = [item for item in items if item.approved]
+    pending = len(items) - len(purchased)
+
+    lines = [
+        {
+            "product_id": item.product_id,
+            "product_name": item.product.product_name,
+            "quantity": item.quantity,
+            "unit_price": item.product.price,
+            "line_total": item.product.price * item.quantity,
+        }
+        for item in purchased
+    ]
+    for item in purchased:
+        db.delete(item)
+    db.commit()
+    return lines, pending
 
 
 def create_message(db: Session, message: MessageCreate):
@@ -160,47 +236,3 @@ def create_message(db: Session, message: MessageCreate):
     db.commit()
     db.refresh(db_message)
     return db_message
-
-
-def add_items_to_cart(db: Session, cart_id: int, user_id: int, items: list[CartItemResponse]) -> list[str]:
-    """Add items to cart and return list of success/error messages"""
-    results = []
-    
-    for item in items:
-        try:
-            # Check if product exists
-            product = db.query(Product).filter(Product.product_id == item.product_id).first()
-            if not product:
-                results.append(f"Product with ID {item.product_id} not found")
-                continue
-            
-            # Check if item already exists in cart
-            existing_item = db.query(CartItem).filter(
-                CartItem.cart_id == cart_id,
-                CartItem.product_id == item.product_id,
-                CartItem.added_by == user_id
-            ).first()
-            
-            if existing_item:
-                # Update quantity of existing item
-                existing_item.quantity += item.quantity
-                db.commit()
-                results.append(f"Updated {product.product_name} quantity to {existing_item.quantity}")
-            else:
-                # Create new cart item
-                cart_item = CartItem(
-                    cart_id=cart_id,
-                    product_id=item.product_id,
-                    added_by=user_id,
-                    quantity=item.quantity,
-                    approved=False  # Items need approval by default
-                )
-                db.add(cart_item)
-                db.commit()
-                results.append(f"Added {item.quantity}x {product.product_name} to cart")
-                
-        except Exception as e:
-            results.append(f"Error adding product {item.product_id}: {str(e)}")
-            db.rollback()
-    
-    return results

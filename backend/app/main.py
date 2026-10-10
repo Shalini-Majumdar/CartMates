@@ -1,27 +1,35 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine
-from models.models import Base
-from routers import auth, carts, products, messages, users
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+from config import settings
+from routers import auth, cart_items, carts, messages, products, users
+
+logging.basicConfig(
+    level=logging.DEBUG if settings.is_development else logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+# Schema is owned by Alembic (`alembic upgrade head`), not by create_all at
+# import time: this database is shared, so changes need reviewable migrations.
 
 app = FastAPI(title="Shopping Cart API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # or ["*"] to allow all
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],  # or explicitly ["POST", "GET", "OPTIONS"]
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(auth.router)
 app.include_router(carts.router)
-app.include_router(products.router)
+app.include_router(cart_items.cart_items_router)
+app.include_router(cart_items.router)
 app.include_router(messages.router)
+app.include_router(products.router)
 app.include_router(users.router)
 
 

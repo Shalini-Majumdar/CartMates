@@ -1,281 +1,93 @@
 import "./SelectedCart.css";
 import Product from "./Product";
-import { useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router-dom";
-import Error from "./Error";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
+import ErrorPopup from "./Error";
 import Chats from "./Chats";
+import { apiFetch } from "./api";
 
 export default function SelectedCart(props) {
   const userId = localStorage.getItem("userId");
   const userName = localStorage.getItem("userName");
   const location = useLocation();
+  const navigate = useNavigate();
   const { cartId } = useParams();
   const [cartItems, setCartItems] = useState([]);
-  const { cartName, cartPrice, isShared, cartDesc } =
-    location.state || "no data";
+  // Router state is only present when navigating from the cart list; on a
+  // direct visit or a hard refresh we have to fetch the cart ourselves.
+  const [cartInfo, setCartInfo] = useState(() => location.state || null);
+  const { cartName, cartPrice, isShared, cartDesc } = cartInfo || {};
   const [loading, setLoading] = useState(true);
   const [chatMessage, setChatMessage] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
+  const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [users, setUsers] = useState([]);
-  const [totalCost, setTotalCost] = useState(0);
+  const [totalCost, setTotalCost] = useState(null);
 
-  // const users = [
-  //   { id: 1, name: "Alice Sharma" },
-  //   { id: 2, name: "Bob Kumar" },
-  //   { id: 3, name: "Charlie D'Souza" },
-  //   { id: 4, name: "Diana Mehta" },
-  //   { id: 5, name: "Ethan Reddy" },
-  // ];
-
-  const sampleChats = [
-    {
-      id: 1,
-      sender: "Alice Sharma",
-      senderType: "user",
-      message: "Hey team, should we add apples to the cart?",
-      sender_id: 8,
-    },
-    {
-      id: 2,
-      sender: "Bob Kumar",
-      senderType: "user",
-      message: "Yes, and maybe some bananas too.",
-      sender_id: 2,
-    },
-    {
-      id: 3,
-      sender: "Charlie D'Souza",
-      senderType: "user",
-      message: "Don't forget about the milk!",
-
-      sender_id: 3,
-    },
-    {
-      id: 4,
-      sender: "CartBot",
-      senderType: "bot",
-      message: "Ive added apples, bananas, and milk to the cart for you.",
-      sender_id: 0,
-    },
-    {
-      id: 5,
-      sender: "Alice Sharma",
-      senderType: "user",
-      message: "Hey team, should we add apples to the cart?",
-      sender_id: 8,
-    },
-    {
-      id: 6,
-      sender: "Bob Kumar",
-      senderType: "user",
-      message: "Yes, and maybe some bananas too.",
-      sender_id: 2,
-    },
-    {
-      id: 7,
-      sender: "Charlie D'Souza",
-      senderType: "user",
-      message: "Don't forget about the milk!",
-      sender_id: 3,
-    },
-    {
-      id: 8,
-      sender: "CartBot",
-      senderType: "bot",
-      message: "Ive added apples, bananas, and milk to the cart for you.",
-      sender_id: 0,
-    },
-  ];
-
-  console.log(location.state);
   //To fetch all products for the selected cart------------------
 
+  const fetchProducts = useCallback(async () => {
+    try {
+      const data = await apiFetch(`/carts/${cartId}/items`);
+      setCartItems(data);
+    } catch (err) {
+      setErrorMessage(err.message || "Something went wrong");
+      setCartItems([]);
+    }
+  }, [cartId]);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const data = await apiFetch(`/messages/${cartId}`);
+      setChatMessages(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setErrorMessage(err.message || "Something went wrong");
+    }
+  }, [cartId]);
+
   useEffect(() => {
+    if (!cartId) return;
     setLoading(true);
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`http://localhost:8000/products/${cartId}`);
-        const data = await res.json();
-        setCartItems(data);
-      } catch (err) {
-        setErrorMessage(err.message || "Something went wrong");
-        setCartItems([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, [cartId]);
-
-  //Increase/Decrease quantity------------------------------------
-
-  const handleIncreaseQuantity = async (cartId, itemId) => {
-    try {
-      const res = await fetch(
-        `http://localhost:8000/products/${itemId}/increase`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cart_item_id: cartId }),
-        }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Failed to increase quantity");
-      }
-
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.pId === itemId ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      );
-
-      setTotalCost(res.updatedTotalCost);
-    } catch (error) {
-      setErrorMessage(error.message || "Something went wrong");
-    }
-  };
-
-  const handleDecreaseQuantity = async (cartId, itemId) => {
-    try {
-      const res = await fetch(
-        `http://localhost:8000/products/${itemId}/decrease`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cart__item_id: cartId }),
-        }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Failed to decrease quantity");
-      }
-
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.pId === itemId ? { ...item, quantity: item.quantity - 1 } : item
-        )
-      );
-
-      setTotalCost(res.updatedTotalCost);
-    } catch (error) {
-      setErrorMessage(error.message || "Something went wrong");
-    }
-  };
-
-  //Approve or Reject product -------------------------------------
-
-  const handleApproveProduct = async (cartId, itemId) => {
-    try {
-      await fetch(`http://localhost:8000/products/${itemId}/approve`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cart_item_id: cartId }),
-      });
-
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.cart_item_id === itemId ? { ...item, approved: true } : item
-        )
-      );
-    } catch (error) {
-      setErrorMessage(error.message || "Something went wrong");
-    }
-  };
-
-  const handleRejectProduct = async (cartId, itemId) => {
-    try {
-      await fetch(`http://localhost:8000/products/${itemId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cart_item_id: cartId }),
-      });
-
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.cart_item_id === itemId ? { ...item, approved: false } : item
-        )
-      );
-    } catch (error) {
-      setErrorMessage(error.message || "Something went wrong");
-    }
-  };
-
-  const handleChatSubmit = async () => {
-    if (chatMessage.trim() === "") return;
-
-    const newUserMessage = {
-      sender_id: userId,
-      cart_id: cartId,
-      message: chatMessage,
-      //add username
-    };
-
-    setChatMessages((prev) => [...prev, newUserMessage]);
-    setChatMessage("");
-
-    try {
-      const res = await fetch("http://localhost:5000/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: newUserMessage.message,
-          cart_id: cartId,
-        }),
-      });
-
-      const reply = await res.json();
-      console.log("Assistant reply:", reply);
-
-      const botMessage = {
-        id: reply.id,
-        sender: reply.sender,
-        message: reply.message || "Bot replied",
-        sender_id: 0,
-      };
-
-      setChatMessages((prev) => [...prev, botMessage]);
-
-      if (reply.products) {
-        setCartItems((prevItems) => [...prevItems, ...reply.products]);
-      }
-    } catch (error) {
-      setErrorMessage(error.message || "Something went wrong");
-    }
-  };
+    fetchProducts().finally(() => setLoading(false));
+  }, [cartId, fetchProducts]);
 
   useEffect(() => {
-    const fetchMessages = async () => {
+    if (cartId) fetchMessages();
+  }, [cartId, fetchMessages]);
+
+  useEffect(() => {
+    if (cartInfo || !cartId || !userId) return;
+
+    const fetchCartInfo = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/messages/${cartId}`);
-
-        if (!res.ok) {
-          setErrorMessage("Failed to fetch messages");
+        const carts = await apiFetch("/carts");
+        const match = carts.find(
+          (c) => String(c.cart_id) === String(cartId)
+        );
+        if (!match) {
+          setErrorMessage("Cart not found");
+          return;
         }
-
-        const data = await res.json();
-        setChatMessages(data);
+        setCartInfo({
+          cartName: match.cart_name,
+          cartDesc: match.cart_description,
+          cartPrice: match.total,
+          isShared: match.is_shared,
+        });
       } catch (err) {
         setErrorMessage(err.message || "Something went wrong");
       }
     };
-    if (cartId) {
-      fetchMessages();
-    }
-  }, [cartId]);
+
+    fetchCartInfo();
+  }, [cartInfo, cartId, userId]);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/carts/${cartId}/users`);
-        if (!res.ok) throw new Error("Failed to fetch cart users");
-        const data = await res.json();
-        setUsers(data); // Populate users array with API response
+        const data = await apiFetch(`/carts/${cartId}/users`);
+        setUsers(data);
       } catch (err) {
         setErrorMessage(
           err.message || "Something went wrong while fetching users"
@@ -288,10 +100,140 @@ export default function SelectedCart(props) {
     }
   }, [cartId]);
 
+  //Increase/Decrease quantity------------------------------------
+
+  const handleIncreaseQuantity = async (cartIdOfItem, cartItemId) => {
+    try {
+      const data = await apiFetch(`/cart-items/${cartItemId}/increase`, {
+        method: "PATCH",
+      });
+
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.cart_item_id === cartItemId
+            ? { ...item, quantity: data.new_quantity }
+            : item
+        )
+      );
+
+      setTotalCost(data.cart_total);
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    }
+  };
+
+  const handleDecreaseQuantity = async (cartIdOfItem, cartItemId) => {
+    try {
+      const data = await apiFetch(`/cart-items/${cartItemId}/decrease`, {
+        method: "PATCH",
+      });
+
+      if (data.new_quantity === undefined) {
+        // The backend deletes the row when the quantity would drop below 1.
+        setCartItems((prev) =>
+          prev.filter((item) => item.cart_item_id !== cartItemId)
+        );
+      } else {
+        setCartItems((prev) =>
+          prev.map((item) =>
+            item.cart_item_id === cartItemId
+              ? { ...item, quantity: data.new_quantity }
+              : item
+          )
+        );
+      }
+
+      setTotalCost(data.cart_total);
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    }
+  };
+
+  //Approve or Reject product -------------------------------------
+
+  const handleApproveProduct = async (cartIdOfItem, cartItemId) => {
+    try {
+      const data = await apiFetch(`/cart-items/${cartItemId}/approve`, {
+        method: "PATCH",
+      });
+
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.cart_item_id === cartItemId ? { ...item, approved: true } : item
+        )
+      );
+
+      setTotalCost(data.cart_total);
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    }
+  };
+
+  const handleRejectProduct = async (cartIdOfItem, cartItemId) => {
+    try {
+      const data = await apiFetch(`/cart-items/${cartItemId}`, {
+        method: "DELETE",
+      });
+
+      // Disapproving removes the item from the cart.
+      setCartItems((prev) =>
+        prev.filter((item) => item.cart_item_id !== cartItemId)
+      );
+
+      setTotalCost(data.cart_total);
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    }
+  };
+
+  const handleChatSubmit = async () => {
+    const text = chatMessage.trim();
+    if (text === "" || isSending) return;
+
+    const optimisticMessage = {
+      message_id: `pending-${Date.now()}`,
+      cart_id: Number(cartId),
+      sender_id: Number(userId),
+      sender_type: "user",
+      sender_name: userName,
+      message_content: text,
+    };
+
+    setChatMessages((prev) => [...prev, optimisticMessage]);
+    setChatMessage("");
+    setIsSending(true);
+
+    try {
+      // The sender is taken from the bearer token, not sent in the body.
+      const reply = await apiFetch("/messages/ask", {
+        method: "POST",
+        body: JSON.stringify({
+          cart_id: Number(cartId),
+          message: text,
+        }),
+      });
+
+      // Re-read the thread so ids and timestamps come from the server.
+      await fetchMessages();
+
+      // cart_changed also covers quantity edits and removals, not just adds.
+      if (reply.cart_changed || reply.items_added > 0) {
+        await fetchProducts();
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+      // The message was stored server-side even if the reply failed, so
+      // re-read the thread instead of guessing what survived.
+      await fetchMessages();
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <>
+      <ErrorPopup message={errorMessage} onClose={() => setErrorMessage("")} />
       <div className="selected-cart-default select-cart-body">
-        <div className="selected-cart-default select-cart-header"></div>
 
         {loading ? (
           <div className="loader"></div>
@@ -311,7 +253,7 @@ export default function SelectedCart(props) {
                   ) : (
                     cartItems.map((p) => (
                       <Product
-                        key={`${p.cart_item_id}-${p.approved}`}
+                        key={p.cart_item_id}
                         pId={p.cart_item_id}
                         name={p.product.product_name}
                         desc={p.product.product_description}
@@ -335,10 +277,27 @@ export default function SelectedCart(props) {
                 </div>
               </div>
               <div className="selected-cart-default left-footer">
-                <span className="left-footer-text">Price</span>
-                <span className="left-footer-price">
-                  ${totalCost ? totalCost : cartPrice}
-                </span>
+                <div className="left-footer-total">
+                  <span className="left-footer-text">
+                    Total (approved items)
+                  </span>
+                  <span className="left-footer-price">
+                    ${totalCost !== null ? totalCost : cartPrice ?? "0.00"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="left-footer-checkout"
+                  disabled={!cartItems.some((item) => item.approved)}
+                  title={
+                    cartItems.some((item) => item.approved)
+                      ? "Buy the approved items in this cart"
+                      : "Approve at least one item to check out"
+                  }
+                  onClick={() => navigate(`/checkout?cart=${cartId}`)}
+                >
+                  Proceed to checkout
+                </button>
               </div>
             </div>
             <div className="selected-cart-default right-div">
@@ -346,17 +305,27 @@ export default function SelectedCart(props) {
                 <div className="selected-cart-default right-header">
                   Your Shopping Assistant
                 </div>
-                {/* change sampleChats */}
                 <div className="selected-cart-default right-body">
-                  {sampleChats.map((chat) => (
-                    <Chats
-                      key={chat.id}
-                      chat={chat.message}
-                      user={chat.sender}
-                      sendType={chat.senderType}
-                      senderId={chat.sender_id}
-                    />
-                  ))}
+                  {chatMessages.length === 0 ? (
+                    <div className="no-items-message">
+                      No messages yet. Ask the assistant for something.
+                    </div>
+                  ) : (
+                    chatMessages.map((chat) => (
+                      <Chats
+                        key={chat.message_id}
+                        chat={chat.message_content}
+                        user={
+                          chat.sender_name ||
+                          (chat.sender_type === "assistant"
+                            ? "Assistant"
+                            : "User")
+                        }
+                        sendType={chat.sender_type}
+                        senderId={chat.sender_id}
+                      />
+                    ))
+                  )}
                 </div>
                 <div className="selected-cart-default right-chat-field">
                   <textarea
@@ -365,20 +334,21 @@ export default function SelectedCart(props) {
                     onChange={(e) => setChatMessage(e.target.value)}
                   ></textarea>
                   <button
-                    type="submit"
+                    type="button"
                     className="selected-cart-default chat-submit"
                     onClick={handleChatSubmit}
+                    disabled={isSending}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
                       height="16"
                       fill="currentColor"
-                      class="bi bi-arrow-up"
+                      className="bi bi-arrow-up"
                       viewBox="0 0 16 16"
                     >
                       <path
-                        fill-rule="evenodd"
+                        fillRule="evenodd"
                         d="M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5"
                       />
                     </svg>
@@ -387,30 +357,28 @@ export default function SelectedCart(props) {
               </div>
 
               {isShared ? (
-                <>
-                  <div className="selected-cart-default display-users-div">
-                    {users.map((user) => (
-                      <div
-                        className="selected-cart-default user-div"
-                        key={user.id}
-                      >
-                        <div className="selected-cart-default user-img-div">
-                          <img
-                            src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.user_name}`}
-                            alt={user.user_name}
-                            className="user-avatar"
-                          />
-                        </div>
-                        <div className="selected-cart-default user-name">
-                          {user.user_name}
-                        </div>
+                <div className="selected-cart-default display-users-div">
+                  {users.map((user) => (
+                    <div
+                      className="selected-cart-default user-div"
+                      key={user.user_id}
+                    >
+                      <div className="selected-cart-default user-img-div">
+                        <img
+                          src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                            user.user_name
+                          )}`}
+                          alt={user.user_name}
+                          className="user-avatar"
+                        />
                       </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <></>
-              )}
+                      <div className="selected-cart-default user-name">
+                        {user.user_name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         )}

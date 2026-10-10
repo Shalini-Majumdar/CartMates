@@ -1,18 +1,10 @@
 import "./Product.css";
-import React from "react";
-import { Link } from "react-router-dom";
 
 export default function Product(props) {
-  const [quantity, setQuantity] = React.useState(props.quantity || 1);
-  const unitPrice = props.cost / props.quantity || 0;
-
-  const increment = () => setQuantity((prev) => prev + 1);
-  const decrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
+  // Quantity is owned by the parent so it always matches the server.
+  const quantity = props.quantity ?? 1;
+  const unitPrice = Number(props.cost) || 0;
   const totalPrice = (unitPrice * quantity).toFixed(2);
-
-  React.useEffect(() => {
-    console.log("approved changed to:", props.approved);
-  }, [props.approved]);
 
   return (
     <>
@@ -25,6 +17,7 @@ export default function Product(props) {
           <div className="item product-img-div">
             <img
               src={props.img}
+              alt={props.name}
               height="100%"
               width="100%"
               onError={(e) => {
@@ -55,7 +48,7 @@ export default function Product(props) {
                 width="70%"
                 height="70%"
                 fill="black"
-                class="bi bi-person-fill"
+                className="bi bi-person-fill"
                 viewBox="0 0 16 16"
               >
                 <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
@@ -67,10 +60,9 @@ export default function Product(props) {
             <div className="item product-qty">
               <div
                 className="item option-subtract"
-                onClick={() => {
-                  decrement();
-                  props.onDecrease && props.onDecrease(props.cartId, props.pId);
-                }}
+                onClick={() =>
+                  props.onDecrease && props.onDecrease(props.cartId, props.pId)
+                }
               >
                 -
               </div>
@@ -78,10 +70,9 @@ export default function Product(props) {
               <div className="item option-qty">{quantity}</div>
               <div
                 className="item option-add"
-                onClick={() => {
-                  increment();
-                  props.onIncrease && props.onIncrease(props.cartId, props.pId);
-                }}
+                onClick={() =>
+                  props.onIncrease && props.onIncrease(props.cartId, props.pId)
+                }
               >
                 +
               </div>
@@ -97,7 +88,7 @@ export default function Product(props) {
               width="20"
               height="20"
               fill="#2D81B2"
-              class="bi bi-hand-thumbs-up-fill"
+              className="bi bi-hand-thumbs-up-fill"
               viewBox="0 0 16 16"
               onClick={() =>
                 props.onApprove && props.onApprove(props.cartId, props.pId)
@@ -110,7 +101,7 @@ export default function Product(props) {
               width="20"
               height="20"
               fill="#2D81B2"
-              class="bi bi-hand-thumbs-down-fill"
+              className="bi bi-hand-thumbs-down-fill"
               viewBox="0 0 16 16"
               onClick={() =>
                 props.onReject && props.onReject(props.cartId, props.pId)

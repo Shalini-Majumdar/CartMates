@@ -2,7 +2,7 @@
   "name": "Python Backend Dev Container",
   "dockerComposeFile": "../docker-compose.yml",
   "service": "backend",
-  "workspaceFolder": "/app",
+  "workspaceFolder": "/app/app",
   "settings": {
     "python.defaultInterpreterPath": "/usr/local/bin/python"
   },

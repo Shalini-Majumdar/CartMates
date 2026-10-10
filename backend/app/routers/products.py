@@ -1,86 +1,81 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+"""Product catalogue for the shop page: browse, filter and sort."""
+
+from decimal import Decimal
+from enum import Enum
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
-from typing import List
+
 from database import get_db
-from schemas.schemas import CartItem
-from crud.crud import (
-    get_cart_products, 
-    increase_cart_item_quantity, 
-    decrease_cart_item_quantity,
-    approve_cart_item,
-    disapprove_cart_item,
-    calculate_cart_total
-)
+from models.models import Product as ProductModel
+from models.models import User as UserModel
+from schemas.schemas import Product
+from security import get_current_user
 
 router = APIRouter(prefix="/products", tags=["products"])
 
-
-@router.get("/{cart_id}", response_model=List[CartItem])
-def get_products_by_cart(cart_id: int, db: Session = Depends(get_db)):
-    products = get_cart_products(db, cart_id=cart_id)
-    return products
+MAX_PAGE_SIZE = 200
 
 
-@router.patch("/{cart_item_id}/increase")
-def increase_quantity(cart_item_id: int, db: Session = Depends(get_db)):
-    cart_item = increase_cart_item_quantity(db, cart_item_id=cart_item_id)
-    if not cart_item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cart item not found"
+class ProductSort(str, Enum):
+    price_asc = "price_asc"
+    price_desc = "price_desc"
+    name = "name"
+    newest = "newest"
+
+
+_ORDERING = {
+    ProductSort.price_asc: (ProductModel.price.asc(), ProductModel.product_id),
+    ProductSort.price_desc: (ProductModel.price.desc(), ProductModel.product_id),
+    ProductSort.name: (func.lower(ProductModel.product_name), ProductModel.product_id),
+    ProductSort.newest: (ProductModel.created_at.desc(), ProductModel.product_id.desc()),
+}
+
+
+@router.get("", response_model=List[Product])
+def list_products(
+    search: Optional[str] = Query(None, max_length=100),
+    category: Optional[str] = Query(None, max_length=100),
+    min_price: Optional[Decimal] = Query(None, ge=0),
+    max_price: Optional[Decimal] = Query(None, ge=0),
+    sort: ProductSort = ProductSort.name,
+    limit: int = Query(MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    query = db.query(ProductModel)
+
+    if search and search.strip():
+        pattern = f"%{search.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(ProductModel.product_name).like(pattern),
+                func.lower(ProductModel.product_description).like(pattern),
+                func.lower(ProductModel.category).like(pattern),
+            )
         )
-    
-    total = calculate_cart_total(db, cart_item.cart_id)
-    
-    return {
-        "message": "Quantity increased",
-        "new_quantity": cart_item.quantity,
-        "cart_total": str(total)
-    }
+    if category:
+        query = query.filter(ProductModel.category == category)
+    if min_price is not None:
+        query = query.filter(ProductModel.price >= min_price)
+    if max_price is not None:
+        query = query.filter(ProductModel.price <= max_price)
+
+    return query.order_by(*_ORDERING[sort]).limit(limit).all()
 
 
-@router.patch("/{cart_item_id}/decrease")
-def decrease_quantity(cart_item_id: int, db: Session = Depends(get_db)):
-    cart_item = decrease_cart_item_quantity(db, cart_item_id=cart_item_id)
-    
-    if cart_item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cart item not found"
-        )
-    
-    total = calculate_cart_total(db, cart_item.cart_id)
-    
-    if hasattr(cart_item, "quantity"):
-        return {
-            "message": "Quantity decreased",
-            "new_quantity": cart_item.quantity,
-            "cart_total": str(total)
-        }
-    else:
-        return {
-            "message": "Item removed from cart",
-            "cart_total": str(total)
-        }
-
-
-@router.patch("/{cart_item_id}/approve")
-def approve_item(cart_item_id: int, db: Session = Depends(get_db)):
-    cart_item = approve_cart_item(db, cart_item_id=cart_item_id)
-    if not cart_item:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cart item not found"
-        )
-    return {"message": "Item approved"}
-
-
-@router.delete("/{cart_item_id}/disapprove")
-def disapprove_item(cart_item_id: int, db: Session = Depends(get_db)):
-    success = disapprove_cart_item(db, cart_item_id=cart_item_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cart item not found"
-        )
-    return {"message": "Item disapproved and removed from cart"}
+@router.get("/categories", response_model=List[str])
+def list_categories(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    rows = (
+        db.query(ProductModel.category)
+        .filter(ProductModel.category.isnot(None))
+        .distinct()
+        .order_by(ProductModel.category)
+        .all()
+    )
+    return [row[0] for row in rows if row[0]]

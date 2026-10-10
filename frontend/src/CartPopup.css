@@ -157,7 +157,32 @@ textarea.form-control {
 
 .search-item.selected {
   background-color: #e0f2fe;
-  font-weight: bold;
+}
+
+.search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-item-name {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.search-item.selected .search-item-name {
+  font-weight: 700;
+}
+
+.search-item-email {
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-all;
+}
+
+.friend-pill-email {
+  font-weight: 400;
+  opacity: 0.75;
 }
 
 .search-input:focus {

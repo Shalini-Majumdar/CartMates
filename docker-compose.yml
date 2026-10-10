@@ -1,6 +1,36 @@
-version: "3.8"
-
 services:
+  db:
+    image: postgres:16
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: cart
+      POSTGRES_PASSWORD: cart
+      POSTGRES_DB: cartdb
+    # 5433 on the host so it cannot clash with a Postgres already installed
+    # on this machine. Inside the compose network it is still db:5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cart -d cartdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Browser UI for looking at and editing the database: http://localhost:8080
+  adminer:
+    image: adminer
+    container_name: db_viewer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -9,9 +39,21 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app
+      - ./backend/app:/app/app
+      - ./backend/alembic.ini:/app/alembic.ini
     env_file:
       - ./backend/.env
+    # Overrides DATABASE_URL from .env: inside Docker the database is the
+    # "db" service, not localhost.
+    environment:
+      DATABASE_URL: postgresql://cart:cart@db:5432/cartdb
+      # File-change events do not cross a Windows bind mount, so have
+      # uvicorn --reload poll for edits instead.
+      WATCHFILES_FORCE_POLLING: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && cd app && python seed_products.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     restart: unless-stopped
 
   frontend:
@@ -25,5 +67,12 @@ services:
       - /app/node_modules
     ports:
       - "3000:3000"
-    command: sh -c "npm install && npm start"
+    environment:
+      VITE_USE_POLLING: "true"
+    command: sh -c "npm install && npm run dev"
     restart: unless-stopped
+
+# Database files live here and survive `docker compose down`.
+# `docker compose down -v` deletes them.
+volumes:
+  pgdata:

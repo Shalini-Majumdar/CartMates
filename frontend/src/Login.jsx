@@ -1,8 +1,17 @@
 import "./Login.css";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import GridMotion from "./GridMotion";
+import { apiFetch, saveSession } from "./api";
+
+// Mirrors UserCreate in backend/app/schemas/schemas.py; keep the two in step.
+const PASSWORD_RULES = [
+  { label: "8 to 72 characters", test: (p) => p.length >= 8 && p.length <= 72 },
+  { label: "One uppercase letter (A-Z)", test: (p) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter (a-z)", test: (p) => /[a-z]/.test(p) },
+  { label: "One number (0-9)", test: (p) => /[0-9]/.test(p) },
+];
 
 export default function Login(props) {
   const [isSignup, setIsSignup] = useState(true);
@@ -52,24 +61,14 @@ export default function Login(props) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/auth/login", {
+      const data = await apiFetch("/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, passwd }),
       });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        localStorage.setItem("userId", data.user_id);
-        localStorage.setItem("userName", data.user_name);
-        navigate("/homepage", { state: { userId: data.user_id } });
-      } else {
-        const err = await res.json();
-        setErrorMessage(err.message || "Login failed");
-      }
+      saveSession(data);
+      navigate("/home");
     } catch (error) {
-      setErrorMessage("Something went wrong. Try again.");
+      setErrorMessage(error.message || "Login failed");
     }
   };
 
@@ -79,30 +78,28 @@ export default function Login(props) {
       return;
     }
 
+    const unmet = PASSWORD_RULES.filter((rule) => !rule.test(passwd));
+    if (unmet.length) {
+      setErrorMessage(
+        "Password needs: " + unmet.map((r) => r.label.toLowerCase()).join(", ") + "."
+      );
+      return;
+    }
+
     if (passwd !== confirm_passwd) {
       setErrorMessage("Passwords do not match.");
       return;
     }
 
     try {
-      const res = await fetch("http://localhost:8000/auth/signup", {
+      const data = await apiFetch("/auth/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, user_name, passwd, confirm_passwd }),
       });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        localStorage.setItem("userId", data.user_id);
-        localStorage.setItem("userName", data.user_name);
-        navigate("/homepage", { state: { userId: data.user_id } });
-      } else {
-        const err = await res.json();
-        setErrorMessage(err.message || "Signup failed");
-      }
+      saveSession(data);
+      navigate("/home");
     } catch (error) {
-      setErrorMessage("Something went wrong. Try again.");
+      setErrorMessage(error.message || "Signup failed");
     }
   };
 
@@ -170,6 +167,30 @@ export default function Login(props) {
                 onChange={(e) => setConfirmPassword(e.target.value)}
               ></input>
             </div>
+
+            {!isSignup && (
+              <ul className="password-rules">
+                {PASSWORD_RULES.map((rule) => {
+                  const met = rule.test(passwd);
+                  return (
+                    <li key={rule.label} className={met ? "met" : ""}>
+                      <span aria-hidden="true">{met ? "✓" : "•"}</span>
+                      {rule.label}
+                    </li>
+                  );
+                })}
+                <li
+                  className={
+                    confirm_passwd && confirm_passwd === passwd ? "met" : ""
+                  }
+                >
+                  <span aria-hidden="true">
+                    {confirm_passwd && confirm_passwd === passwd ? "✓" : "•"}
+                  </span>
+                  Passwords match
+                </li>
+              </ul>
+            )}
 
             {errorMessage && (
               <div className="default-login login-error">{errorMessage}</div>

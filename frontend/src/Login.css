@@ -144,6 +144,35 @@ body {
   color: red;
 }
 
+.password-rules {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  font-family: "Outfit", sans-serif;
+  font-size: 0.8rem;
+  color: #949494;
+}
+
+.password-rules li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.3s ease;
+}
+
+.password-rules li span {
+  width: 12px;
+  text-align: center;
+}
+
+.password-rules li.met {
+  color: #2e9d5b;
+}
+
 @media screen and (max-width: 1024px) {
   .login-body {
     flex-direction: column-reverse;

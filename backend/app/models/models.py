@@ -32,9 +32,15 @@ class Cart(Base):
     
     # Relationships
     creator = relationship("User", back_populates="created_carts")
-    cart_users = relationship("CartUser", back_populates="cart")
-    cart_items = relationship("CartItem", back_populates="cart")
-    messages = relationship("Message", back_populates="cart")
+    cart_users = relationship(
+        "CartUser", back_populates="cart", cascade="all, delete-orphan"
+    )
+    cart_items = relationship(
+        "CartItem", back_populates="cart", cascade="all, delete-orphan"
+    )
+    messages = relationship(
+        "Message", back_populates="cart", cascade="all, delete-orphan"
+    )
 
 
 class CartUser(Base):
@@ -60,7 +66,9 @@ class Product(Base):
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     
     # Relationships
-    cart_items = relationship("CartItem", back_populates="product")
+    cart_items = relationship(
+        "CartItem", back_populates="product", cascade="all, delete-orphan"
+    )
 
 
 class CartItem(Base):
@@ -86,7 +94,7 @@ class Message(Base):
     message_id = Column(Integer, primary_key=True, index=True)
     cart_id = Column(Integer, ForeignKey("carts.cart_id"))
     sender_id = Column(Integer, ForeignKey("users.user_id"))
-    sender_type = Column(String(50), default='assistant')
+    sender_type = Column(String(50), nullable=False, default='user')
     message_content = Column(Text, nullable=False)
     timestamp = Column(TIMESTAMP, default=func.current_timestamp())
     

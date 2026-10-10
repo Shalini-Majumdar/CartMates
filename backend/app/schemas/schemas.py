@@ -1,17 +1,32 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
 
+MIN_PASSWORD_LENGTH = 8
+
+
 class UserBase(BaseModel):
-    user_name: str
-    email: str
+    user_name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
 
 
 class UserCreate(UserBase):
-    passwd: str
+    # bcrypt silently truncates beyond 72 bytes, so cap the input there.
+    passwd: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=72)
     confirm_passwd: str
+
+    @field_validator('passwd')
+    @classmethod
+    def password_is_strong(cls, v: str) -> str:
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain a lowercase letter')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain an uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain a digit')
+        return v
 
     @field_validator('confirm_passwd')
     @classmethod
@@ -22,7 +37,7 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     passwd: str
 
 
@@ -32,6 +47,12 @@ class User(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: User
+
+
 class CartBase(BaseModel):
     cart_name: str
     cart_description: Optional[str] = None
@@ -39,7 +60,7 @@ class CartBase(BaseModel):
 
 
 class CartCreate(CartBase):
-    pass
+    shared_with: list[int] = []
 
 
 class Cart(CartBase):
@@ -60,10 +81,6 @@ class ProductBase(BaseModel):
     category: Optional[str] = None
 
 
-class ProductCreate(ProductBase):
-    pass
-
-
 class Product(ProductBase):
     product_id: int
     created_at: datetime
@@ -74,11 +91,6 @@ class Product(ProductBase):
 class CartItemBase(BaseModel):
     product_id: int
     quantity: int = 1
-
-
-class CartItemCreate(CartItemBase):
-    cart_id: int
-    added_by: int
 
 
 class CartItem(CartItemBase):
@@ -99,13 +111,13 @@ class MessageBase(BaseModel):
 
 class MessageCreate(MessageBase):
     cart_id: int
-    sender_id: int
+    sender_id: Optional[int] = None
 
 
 class Message(MessageBase):
     message_id: int
     cart_id: int
-    sender_id: int
+    sender_id: Optional[int] = None
     timestamp: datetime
     
     model_config = ConfigDict(from_attributes=True)
@@ -115,28 +127,39 @@ class CartItemUpdate(BaseModel):
     quantity: int
 
 
-class AskRequest(BaseModel):
-    user_id: int
-    cart_id: int
-    message: str
-
-
-class CartItemResponse(BaseModel):
+class CartItemAdd(BaseModel):
     product_id: int
+    quantity: int = Field(default=1, ge=1, le=99)
+
+
+class OrderLine(BaseModel):
+    product_id: int
+    product_name: str
     quantity: int
+    unit_price: Decimal
+    line_total: Decimal
 
-class LLMResponse(BaseModel):
-    items: list[CartItemResponse]
 
-class ParsedResponse(BaseModel):
-    message: str
-    items: list[CartItemResponse]
-    error: Optional[str] = None
+class CheckoutReceipt(BaseModel):
+    order_number: str
+    cart_id: int
+    cart_name: str
+    placed_at: datetime
+    items: list[OrderLine]
+    total: Decimal
+    # Pending items are not bought; they stay in the cart for approval.
+    items_left_pending: int
+
+
+class AskRequest(BaseModel):
+    cart_id: int
+    message: str = Field(min_length=1, max_length=2000)
+
 
 class ResMessage(BaseModel):
     message_id: int
     cart_id: int
-    sender_id: int
+    sender_id: Optional[int] = None
     sender_type: str
     sender_name: Optional[str] = None
     message_content: str

@@ -1,32 +1,26 @@
 import "./HomePage.css";
 import Cart from "./Cart";
-import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import CartPopup from "./CartPopup";
+import ErrorPopup from "./Error";
+import { apiFetch } from "./api";
 
 export default function HomePage(props) {
   const userId = localStorage.getItem("userId");
-  const userName = localStorage.getItem("userName");
   const [cartData, setCartData] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const navigate = useNavigate();
-
   //To fetch all carts------------------------UPDATE
-
-  useEffect(() => {
-    console.log("Updated cartData:", cartData);
-  }, [cartData]);
 
   useEffect(() => {
     const fetchCarts = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/carts/${userId}`);
-        const data = await res.json();
-        setCartData(data);
+        // The backend derives the owner from the token; no id in the path.
+        const data = await apiFetch("/carts");
+        setCartData(Array.isArray(data) ? data : []);
       } catch (error) {
         setErrorMessage(error.message || "Something went wrong");
         setCartData([]);
@@ -44,18 +38,10 @@ export default function HomePage(props) {
 
   const handleDelete = async (cartId) => {
     try {
-      const res = await fetch(`http://localhost:8000/carts/${cartId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setCartData((prevCarts) =>
-          prevCarts.filter((cart) => cart.cart_id !== cartId)
-        );
-        console.log("Cart deleted successfully");
-      } else {
-        setErrorMessage("Something went wrong");
-      }
+      await apiFetch(`/carts/${cartId}`, { method: "DELETE" });
+      setCartData((prevCarts) =>
+        prevCarts.filter((cart) => cart.cart_id !== cartId)
+      );
     } catch (error) {
       setErrorMessage(error.message || "Something went wrong");
     }
@@ -66,32 +52,12 @@ export default function HomePage(props) {
   const handleAddCart = async (newCart) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/carts/${userId}`, {
+      const savedCart = await apiFetch("/carts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(newCart),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to add cart");
-      }
-
-      const savedCart = await res.json();
-
-      const updatedCart = {
-        cart_id: savedCart.cart_id,
-        cart_name: savedCart.cart_name,
-        cart_description: savedCart.cart_description,
-        date_created: savedCart.date_created,
-        total: savedCart.total,
-        // approved: savedCart.approved,
-        people: savedCart.people,
-        is_shared: savedCart.is_shared,
-      };
-
-      setCartData((prev) => [...prev, updatedCart]);
+      setCartData((prev) => [...prev, savedCart]);
     } catch (error) {
       setErrorMessage(error.message || "Something went wrong");
     } finally {
@@ -101,8 +67,8 @@ export default function HomePage(props) {
 
   return (
     <>
+      <ErrorPopup message={errorMessage} onClose={() => setErrorMessage("")} />
       <div className="default-home homepage-body">
-        <div className="default-home header">Welcome, {userName}</div>
         <div className="default-home main-heading-div">
           <div className="default-home main-title">
             Your Carts
@@ -129,7 +95,7 @@ export default function HomePage(props) {
         <div className="default-home main-body">
           {isLoading ? (
             // <div className="loading-popup">Loading carts...</div>
-            <div class="loader"></div>
+            <div className="loader"></div>
           ) : (
             cartData.map((cart) => (
               <Cart
@@ -137,7 +103,6 @@ export default function HomePage(props) {
                 cartId={cart.cart_id}
                 cartName={cart.cart_name}
                 cartDesc={cart.cart_description}
-                people={cart.people}
                 date={cart.date_created}
                 price={cart.total}
                 onDelete={() => handleDelete(cart.cart_id)}
@@ -146,12 +111,7 @@ export default function HomePage(props) {
             ))
           )}
         </div>
-        <div className="default-home footer">
-          <Link
-            to="/selectedcart"
-            className="default-login login-button"
-          ></Link>
-        </div>
+        <div className="default-home footer"></div>
       </div>
     </>
   );
