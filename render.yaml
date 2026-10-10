@@ -1,0 +1,60 @@
+# Render Blueprint: deploys the API and the web app together.
+# Render dashboard -> New -> Blueprint -> pick this repo.
+#
+# Values marked `sync: false` are secrets or URLs that Render asks for when
+# the Blueprint is first created; they are never stored in this file.
+# The database is not defined here: point DATABASE_URL at Neon (or any
+# PostgreSQL), since Render's free database is deleted after 30 days.
+
+services:
+  # FastAPI backend. On every start the Dockerfile runs migrations, seeds
+  # the product catalogue if it is empty, then serves on $PORT.
+  - type: web
+    name: cartmates-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    # Only redeploy the API when backend files change.
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_API_KEY
+        sync: false
+      # Exact origin of the web app, e.g. https://cartmates.onrender.com
+      # (no trailing slash; comma-separate several).
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+  # React frontend, built once by Vite and served as static files.
+  - type: web
+    name: cartmates
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: build
+    # The router handles paths like /cart/5 in the browser, so every path
+    # must serve index.html rather than 404.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Vite 7 needs Node 20.19+.
+      - key: NODE_VERSION
+        value: "22"
+      # Public URL of cartmates-api, e.g. https://cartmates-api.onrender.com.
+      # Baked in at build time: changing it needs a redeploy of this site.
+      - key: VITE_API_URL
+        sync: false
